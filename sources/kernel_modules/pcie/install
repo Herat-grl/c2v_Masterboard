@@ -1,0 +1,15 @@
+#!/bin/sh
+make clean;
+    make EXTRA_CFLAGS=-DARRIA10;
+if [ `lsmod | grep -o altera_dma_x8` ]
+then
+    ./unload_x8
+fi
+if [ `lsmod | grep -o altera_dma_x4` ]
+then
+    ./unload_x4
+fi
+./altera_dma_load_x8
+./altera_dma_load_x4
+
+
