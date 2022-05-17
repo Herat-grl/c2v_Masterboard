@@ -179,10 +179,10 @@ static ssize_t etx_read(struct file *filp, char __user *buf, size_t len, loff_t 
     printk("value : %d\n", value);
     if(value == data_buf[0]) {
         printk("pass gpio test...\n");
-        result = 1;
+        result = 0;
     } else {
         printk("fail gpio test...\n");
-        result = 0;
+        result = 1;
     }
     
     if (copy_to_user(buf, &result, 1)) {

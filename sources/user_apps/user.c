@@ -26,6 +26,7 @@
 #define DMA_UART 3
 #define DMA_SPI 4
 #define DMA_I2C 5
+#define GPIO_PIN 6
 
 #define DATA_MAX_SIZE 512
 
@@ -39,6 +40,7 @@ static const char *spi_device = "/dev/spidev0.0";
 static const char *uart_device = "/dev/ttyTHS0";
 static const char *pcie_device_x8 = "/dev/altera_dma_x8";
 static const char *pcie_device_x4 = "/dev/altera_dma_x4";
+static const char *gpio = "/dev/phy_intr";
 static uint32_t mode;
 static uint8_t bits = 8;
 static uint32_t spi_speed;
@@ -431,10 +433,16 @@ void grl_print_menu (char *buf) {
 			status_flag = 0;
 
 			printf("SPI read-write time :   %ld  ns\n\n", elapsed);
-		} else {
+		} else if(test_input == 5) {
 			printf("I2C read time       :     us\n");
 			printf("I2C write time      :     us\n");
 			printf("I2C read-write time :     us\n\n");
+		} else {
+			if(status_flag) {
+				printf("GPIO pin test : failed\n");
+			} else {
+				printf("GPIO pin test : passed\n");
+			}
 		}
 		menu_flag = 0;
 	} 
@@ -599,7 +607,7 @@ int test_dma_spi(char *buf) {
 		printf("Data matched : %d\n", count);
 
 	menu_flag = 1;
-
+	close(fd);
 	grl_print_menu(buf);
 	return 0;
 }
@@ -609,6 +617,55 @@ int test_dma_i2c(char *buf) {
 
 	grl_print_menu(buf);
 	return 0;
+}
+
+int test_gpio_pins(char *buf) {
+	int num, data;
+    char line[BUFFER_LENGTH];
+
+    ssize_t fd = open (gpio, O_RDWR);
+    if (fd == -1) {
+        printf ("Couldn't open the device.\n");
+        return 0;
+    } else {
+        printf ("Opened the device: file handle #%lu!\n", (long unsigned int)fd);
+    }
+    
+    printf("       1 : test gpio9 & gpio15 with 0 value\n");
+    printf("       2 : test gpio9 & gpio15 with 1 value\n");
+    printf("       3 : test gpio25 & gpio16 with 0 value\n");
+    printf("       4 : test gpio25 & gpio16 with 1 value\n");    
+    scanf("%d", &num);
+
+    if(num == 1) {
+        buf[0] = 0;
+        buf[1] = 1;
+        read (fd, buf, 2);
+        printf("value : %d\n", buf[0]);
+    } else if(num == 2) {
+        buf[0] = 1;
+        buf[1] = 1;
+        read (fd, buf, 2);
+        printf("value : %d\n", buf[0]);
+    } else if(num == 3) {
+        buf[0] = 0;
+        buf[1] = 2;
+        read (fd, buf, 2);
+        printf("value : %d\n", buf[0]);
+    } else if(num == 4) {
+        buf[0] = 1;
+        buf[1] = 2;
+        read (fd, buf, 2);
+        printf("value : %d\n", buf[0]);
+    } else {
+        printf("invalid input\n");
+		return -1;
+    }
+	close(fd);
+	status_flag = buf[0];
+	menu_flag = 1;
+	grl_print_menu(buf);
+    return 0;
 }
 
 int test_dma_periferal(char *buf) {
@@ -632,6 +689,9 @@ int test_dma_periferal(char *buf) {
 			break;
 		case DMA_I2C:
 			test_dma_i2c(buf);
+			break;
+		case GPIO_PIN:
+			test_gpio_pins(buf);
 			break;
 		default:
 			printf("not valid test periferal\n");
@@ -663,7 +723,7 @@ int main() {
 				break;
 
 			case ALTERA_CMD_START_DMA:
-				printf("enter : \n\t# 1. test PCI x8\n\t# 2. test PCI x4\n\t# 3. Test UART\n\t# 4. Test SPI\n\t# 5. Test I2C\n");
+				printf("enter : \n\t# 1. test PCI x8\n\t# 2. test PCI x4\n\t# 3. Test UART\n\t# 4. Test SPI\n\t# 5. Test I2C\n\t# 6. Test GPIO\n");
 				scanf("%d", &test_input);
 				test_dma_periferal(buf);
 				break;

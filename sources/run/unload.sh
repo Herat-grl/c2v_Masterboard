@@ -3,3 +3,5 @@ cd ../kernel_modules/pcie
 ./unload_x8
 ./unload_x4
 
+cd ../gpio
+./unload.sh
