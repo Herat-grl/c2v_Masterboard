@@ -469,6 +469,13 @@ static int dma_test(struct altera_pcie_dma_bookkeep *bk_ptr, struct pci_dev *dev
     bk_ptr->dma_status.read_eplast_timeout = 0;
     bk_ptr->dma_status.write_eplast_timeout = 0;
 
+    if(!bk_ptr->dma_status.run_read) {
+        iowrite32 (0x0, bk_ptr->bar[4]+DESC_CTRLLER_BASE+0x1ac8);
+        iowrite32 (0x2F, bk_ptr->bar[4]+DESC_CTRLLER_BASE+0x1af4);
+        iowrite32 (0xFFFFFFFF, bk_ptr->bar[4]+DESC_CTRLLER_BASE+0x1ac8);
+        iowrite32 (0x1, bk_ptr->bar[4]+DESC_CTRLLER_BASE+0x1ac8);
+    }
+
     if(bk_ptr->dma_status.run_read) {
         printk(KERN_DEBUG "Read DMA...\n");
         dst_addr = (u64)MEM_BASE_X8; // + 0x200000;

@@ -452,28 +452,45 @@ void grl_print_menu (char *buf) {
 
 int test_dma_pcie_x8(char *buf) {
 	struct dma_cmd cmd;
+	int num;
 	cmd.usr_buf_size = sizeof(struct dma_status);
 
-	ssize_t f = open (pcie_device_x8, O_RDWR);
-	if (f == -1) {
+	ssize_t fd = open (pcie_device_x8, O_RDWR);
+	if (fd == -1) {
 		printf ("Couldn't open the device.\n");
 		return 0;
 	} else {
-		printf ("Opened the device: file handle #%lu!\n", (long unsigned int)f);
+		printf ("Opened the device: file handle #%lu!\n", (long unsigned int)fd);
+	}
+
+	printf("press 1: autofill\n");
+	printf("      0: self writing\n");
+	scanf("%d", &num);
+	if(num) {		//to test with autofill data with FPGA
+        cmd.cmd = ALTERA_CMD_ENA_DIS_READ;
+        cmd.buf = buf;
+        write (fd, &cmd, 0);
 	}
 
 	cmd.cmd = ALTERA_CMD_READ_STATUS;
 	cmd.buf = buf;
-	write (f, &cmd, 0);
+	write (fd, &cmd, 0);
 
-	ioctl(f, ALTERA_IOCX_START);
-	ioctl(f, ALTERA_IOCX_WAIT);
+	ioctl(fd, ALTERA_IOCX_START);
+	ioctl(fd, ALTERA_IOCX_WAIT);
 	cmd.cmd = ALTERA_CMD_READ_STATUS;
 	cmd.buf = buf;
-	write (f, &cmd, 0);
+	write (fd, &cmd, 0);
 	menu_flag = 1;
 
+	if(num) {	// to clear autofill test case
+        cmd.cmd = ALTERA_CMD_ENA_DIS_READ;
+        cmd.buf = buf;
+        write (fd, &cmd, 0);
+	}
+
 	grl_print_menu(buf);
+	close(fd);
 	return 0;
 }
 
@@ -481,26 +498,27 @@ int test_dma_pcie_x4(char *buf) {
 	struct dma_cmd cmd;
 	cmd.usr_buf_size = sizeof(struct dma_status);
 
-	ssize_t f = open (pcie_device_x4, O_RDWR);
-	if (f == -1) {
+	ssize_t fd = open (pcie_device_x4, O_RDWR);
+	if (fd == -1) {
 		printf ("Couldn't open the device.\n");
 		return 0;
 	} else {
-	//	printf ("Opened the device: file handle #%lu!\n", (long unsigned int)f);
+		printf ("Opened the device: file handle #%lu!\n", (long unsigned int)fd);
 	}
 
-	cmd.cmd = ALTERA_CMD_READ_STATUS;
-	cmd.buf = buf;
-	write (f, &cmd, 0);
+	// cmd.cmd = ALTERA_CMD_READ_STATUS;
+	// cmd.buf = buf;
+	// write (fd, &cmd, 0);
 
-	ioctl(f, ALTERA_IOCX_START);
-	ioctl(f, ALTERA_IOCX_WAIT);
+	ioctl(fd, ALTERA_IOCX_START);
+	ioctl(fd, ALTERA_IOCX_WAIT);
 	cmd.cmd = ALTERA_CMD_READ_STATUS;
 	cmd.buf = buf;
-	write (f, &cmd, 0);
+	write (fd, &cmd, 0);
 	menu_flag = 1;
 
 	grl_print_menu(buf);
+	close(fd);
 	return 0;
 }
 
