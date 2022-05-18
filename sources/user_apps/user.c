@@ -403,12 +403,22 @@ void grl_print_menu (char *buf) {
 			printf("PCI x8 read Throughput         : %f GB/S\n", (((struct dma_status *)buf)->length_transfer*0.954)/(((struct dma_status *)buf)->read_time.tv_usec + 1000000*((struct dma_status *)buf)->read_time.tv_sec ));
 			printf("PCI x8 Write Time              : %ld s and %ld us\n", ((struct dma_status *)buf)->write_time.tv_sec, ((struct dma_status *)buf)->write_time.tv_usec);
 			printf("PCI x8 Write Throughput        : %f GB/S\n\n", (((struct dma_status *)buf)->length_transfer*0.954)/(((struct dma_status *)buf)->write_time.tv_usec + 1000000*((struct dma_status *)buf)->write_time.tv_sec ));
+			if(((struct dma_status *)buf)->pass_write) {
+				printf("Pass Write : Passed\n");
+			} else {
+				printf("Pass Write : Failed\n");
+			}
 		} else if(test_input == 2) {
 			printf("Access On Chip RAM	? %d\n\n", ((struct dma_status *)buf)->onchip);
 			printf("PCI x4 Read Time               : %ld s and %ld us\n", ((struct dma_status *)buf)->read_time.tv_sec, ((struct dma_status *)buf)->read_time.tv_usec);
 			printf("PCI x4 read Throughput         : %f GB/S\n", (((struct dma_status *)buf)->length_transfer*0.954)/(((struct dma_status *)buf)->read_time.tv_usec + 1000000*((struct dma_status *)buf)->read_time.tv_sec ));
 			printf("PCI x4 Write Time              : %ld s and %ld us\n", ((struct dma_status *)buf)->write_time.tv_sec, ((struct dma_status *)buf)->write_time.tv_usec);
 			printf("PCI x4 Write Throughput        : %f GB/S\n\n", (((struct dma_status *)buf)->length_transfer*0.954)/(((struct dma_status *)buf)->write_time.tv_usec + 1000000*((struct dma_status *)buf)->write_time.tv_sec ));
+			if(((struct dma_status *)buf)->pass_write) {
+				printf("Pass Write : Passed\n");
+			} else {
+				printf("Pass Write : Failed\n");
+			}
 		} else if(test_input == 3) {
 			elapsed_rw = 1000000000 * (stop_uart_r.tv_sec - start_uart_w.tv_sec) + stop_uart_r.tv_nsec - start_uart_w.tv_nsec;
 			elapsed_r = 1000000000 * (stop_uart_r.tv_sec - start_uart_r.tv_sec) + stop_uart_r.tv_nsec - start_uart_r.tv_nsec;

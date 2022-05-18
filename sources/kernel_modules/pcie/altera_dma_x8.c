@@ -15,6 +15,7 @@
 #include "altera_dma.h"
 #include <linux/unistd.h>
 #include <linux/uaccess.h>
+#include <linux/delay.h>
 
 #define TIMEOUT 0x2000000
 
@@ -470,10 +471,12 @@ static int dma_test(struct altera_pcie_dma_bookkeep *bk_ptr, struct pci_dev *dev
     bk_ptr->dma_status.write_eplast_timeout = 0;
 
     if(!bk_ptr->dma_status.run_read) {
+        printk("writing to DMA register...\n");
         iowrite32 (0x0, bk_ptr->bar[4]+DESC_CTRLLER_BASE+0x1ac8);
         iowrite32 (0x2F, bk_ptr->bar[4]+DESC_CTRLLER_BASE+0x1af4);
-        iowrite32 (0xFFFFFFFF, bk_ptr->bar[4]+DESC_CTRLLER_BASE+0x1ac8);
+        iowrite32 (0xFFFFFFFF, bk_ptr->bar[4]+DESC_CTRLLER_BASE+0x1ac4);
         iowrite32 (0x1, bk_ptr->bar[4]+DESC_CTRLLER_BASE+0x1ac8);
+        msleep(10000);
     }
 
     if(bk_ptr->dma_status.run_read) {
@@ -547,7 +550,8 @@ do_gettimeofday(&tv1);
 	}
 
     if (bk_ptr->dma_status.run_write) {
-	timeout = TIMEOUT;
+        printk(KERN_DEBUG "Write DMA...\n");
+	    timeout = TIMEOUT;
 
         memset(rp_wr_buffer_virt_addr, 0, bk_ptr->dma_status.altera_dma_num_dwords*4);
 	
@@ -610,10 +614,11 @@ do_gettimeofday(&tv1);
                  
         	    bk_ptr->dma_status.pass_write = 0;
                 printk("HERAT...fail writing : %d\n", data_rot);
+                break;
         	}
         	else {
         	    bk_ptr->dma_status.pass_write = 1;
-                printk("HERAT...pass writing : %d\n", data_rot);   
+            //    printk("HERAT...pass writing : %d\n", data_rot);
             }
     	}
     }   //data rotation
