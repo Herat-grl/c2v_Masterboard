@@ -14,6 +14,7 @@
 #include <pthread.h>
 
 #include <asm/termios.h> /*termio.h for serial IO api*/
+#include "i2c.h"
 
 
 
@@ -53,7 +54,7 @@ uint8_t default_tx[DATA_MAX_SIZE] ;
 uint8_t default_rx[DATA_MAX_SIZE] = {0, };
 
 char *input_tx;
-struct timespec start_uart_w, stop_uart_w, start_uart_r, stop_uart_r, start, stop;
+struct timespec start_uart_w, stop_uart_w, start_uart_r, stop_uart_r, start_spi, stop_spi, start_i2c, stop_i2c;
 uint64_t elapsed = 0, start_time = 0, stop_time = 0, elapsed_rw = 0, elapsed_r = 0, elapsed_w = 0;
 int count;
 int status_flag = 0, inval_flag = 0;
@@ -142,7 +143,7 @@ static void transfer(int fd, uint8_t const *tx, uint8_t const *rx, size_t len)
 
 #ifdef TIME_STAMP
 	/* POSIX.1-2008 way */
-	if (clock_gettime(CLOCK_REALTIME,&start))
+	if (clock_gettime(CLOCK_REALTIME,&start_spi))
 	{
 		printf("Failed to get Start Time!\n");
 	}
@@ -152,7 +153,7 @@ static void transfer(int fd, uint8_t const *tx, uint8_t const *rx, size_t len)
 
 #ifdef TIME_STAMP
 	/* POSIX.1-2008 way */
-	if (clock_gettime(CLOCK_REALTIME,&stop))
+	if (clock_gettime(CLOCK_REALTIME,&stop_spi))
 	{
 		printf("Failed to get Stop Time!\n");
 	}
@@ -369,18 +370,15 @@ void reset () {
 
 
 void grl_print_menu (char *buf) {
+	int i;
 	system("clear");
 	red();
 	printf("|-------------------------NOTE----------------------|\n");
 	printf("| Please ensure you have loaded specific jic/sof    |\n");
-	printf("| file to test specific periferal as below          |\n");
-	printf("| --> PCIe x8 	: PCIe_gen3_x8.jic                  |\n");
-	printf("| --> PCIe x4 	: PCIe_gen3_x4.jic                  |\n");
-	printf("| --> PCIe UART : Uart.sof                          |\n");
-	printf("| --> PCIe SPI 	: Spi.sof                           |\n");
 	printf("|                                                   |\n");
-	printf("|UART Max speed : 12 MbPS                           |\n");
-	printf("|SPI max speed : 50 MbPS                            |\n");
+	printf("|                                                   |\n");
+	printf("|UART Max speed : 12 Mbps                           |\n");
+	printf("|SPI max speed : 50 Mbps                            |\n");
 	printf("|---------------------------------------------------|\n\n");
 	reset();
 	printf("\n**********************************************\n");
@@ -435,7 +433,7 @@ void grl_print_menu (char *buf) {
 			printf("UART write time      :   %ld   ns\n", elapsed_w);
 			printf("UART read-write time :   %ld   ns\n\n", elapsed_rw);
 		} else if(test_input == 4) {
-			elapsed = 1000000000 * (stop.tv_sec - start.tv_sec) + stop.tv_nsec - start.tv_nsec;
+			elapsed = 1000000000 * (stop_spi.tv_sec - start_spi.tv_sec) + stop_spi.tv_nsec - start_spi.tv_nsec;
 			if(status_flag)
 				printf("Data Does not Match!\n");
 			else
@@ -444,9 +442,10 @@ void grl_print_menu (char *buf) {
 
 			printf("SPI read-write time :   %ld  ns\n\n", elapsed);
 		} else if(test_input == 5) {
-			printf("I2C read time       :     us\n");
-			printf("I2C write time      :     us\n");
-			printf("I2C read-write time :     us\n\n");
+			elapsed = 1000000000 * (stop_i2c.tv_sec - start_i2c.tv_sec) + stop_i2c.tv_nsec - start_i2c.tv_nsec;
+			for(i=0;i<10;i++)
+				printf("%x ", buf[i]);
+			printf("\nI2C read time       :   %ld ns\n\n", elapsed);
 		} else {
 			if(status_flag) {
 				printf("GPIO pin test : failed\n");
@@ -625,9 +624,6 @@ int test_dma_spi(char *buf) {
 
 	transfer(fd, default_tx, default_rx, sizeof(default_tx));
 
-	start_time = (start.tv_sec * 1000000000) + start.tv_nsec;
-	stop_time = (stop.tv_sec * 1000000000) + stop.tv_nsec;
-
 	match = check_dump();
 	if(match) 
 		printf("data not Matched!\n");
@@ -642,6 +638,51 @@ int test_dma_spi(char *buf) {
 
 int test_dma_i2c(char *buf) {
 	menu_flag = 1;
+	// char buf[10]={0,0};
+	char wbuf[10]={0,0};
+	struct I2cDevice dev;
+	int i, rc;
+
+	/*
+	 * Set the I2C bus filename and slave address,
+	 */
+	dev.filename = "/dev/i2c-8";	//i2c5 : bus: 8
+	dev.addr = 0x8;		//slave address
+
+	/*
+	 * Start the I2C device.
+	 */
+	rc = i2c_start(&dev);
+	if (rc) {
+		printf("failed to start i2c device\r\n");
+		return rc;
+	}
+
+	/* POSIX.1-2008 way */
+	if (clock_gettime(CLOCK_REALTIME,&start_i2c))
+	{
+		printf("Failed to get Time!\n");
+	}
+
+
+	wbuf[0]=0x05;
+	wbuf[1]=0x01;
+	rc = i2c_write(&dev,wbuf,10);
+        if(rc==0)
+        {
+            printf("fail to write\n");
+            return -1;
+		}
+
+	i2c_read(&dev,buf,10);		//to aoid last reading fifo buffer at slave side
+	i2c_read(&dev,buf,10);
+
+	/* POSIX.1-2008 way */
+	if (clock_gettime(CLOCK_REALTIME,&stop_i2c))
+	{
+		printf("Failed to get Time!\n");
+	}
+	i2c_stop(&dev);
 
 	grl_print_menu(buf);
 	return 0;
