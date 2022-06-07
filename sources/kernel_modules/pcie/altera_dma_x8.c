@@ -476,6 +476,7 @@ static int dma_test(struct altera_pcie_dma_bookkeep *bk_ptr, struct pci_dev *dev
         iowrite32 (0x2F, bk_ptr->bar[4]+DESC_CTRLLER_BASE+0x1af4);
         iowrite32 (0xFFFFFFFF, bk_ptr->bar[4]+DESC_CTRLLER_BASE+0x1ac4);
         iowrite32 (0x1, bk_ptr->bar[4]+DESC_CTRLLER_BASE+0x1ac8);
+        bk_ptr->dma_status.pass_read = 0; 
         msleep(10000);
     }
 
@@ -531,8 +532,9 @@ do_gettimeofday(&tv1);
 
 	if(timeout == 0){
 		bk_ptr->dma_status.pass_read = 0;
-	}
-	// else{
+	} else{
+        bk_ptr->dma_status.pass_read = 1;
+    }
 	// //	printk(KERN_DEBUG "Read buffer data\n");
 	// 	if (rp_ep_compare(rp_rd_buffer_virt_addr, bk_ptr, 0, bk_ptr->dma_status.altera_dma_num_dwords, data_rot)) {
     //     	    bk_ptr->dma_status.pass_read = 0;

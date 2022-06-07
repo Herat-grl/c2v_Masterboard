@@ -396,9 +396,10 @@ void grl_print_menu (char *buf) {
 	}
 	if(menu_flag) {
 		if(test_input == 1) {
-			printf("Access On Chip RAM	? %d\n\n", ((struct dma_status *)buf)->onchip);
-			printf("PCI x8 Read Time               : %ld s and %ld us\n", ((struct dma_status *)buf)->read_time.tv_sec, ((struct dma_status *)buf)->read_time.tv_usec);
-			printf("PCI x8 read Throughput         : %f GB/S\n", (((struct dma_status *)buf)->length_transfer*0.954)/(((struct dma_status *)buf)->read_time.tv_usec + 1000000*((struct dma_status *)buf)->read_time.tv_sec ));
+			if(((struct dma_status *)buf)->pass_read) {
+				printf("PCI x8 Read Time               : %ld s and %ld us\n", ((struct dma_status *)buf)->read_time.tv_sec, ((struct dma_status *)buf)->read_time.tv_usec);
+				printf("PCI x8 read Throughput         : %f GB/S\n", (((struct dma_status *)buf)->length_transfer*0.954)/(((struct dma_status *)buf)->read_time.tv_usec + 1000000*((struct dma_status *)buf)->read_time.tv_sec ));
+			}
 			printf("PCI x8 Write Time              : %ld s and %ld us\n", ((struct dma_status *)buf)->write_time.tv_sec, ((struct dma_status *)buf)->write_time.tv_usec);
 			printf("PCI x8 Write Throughput        : %f GB/S\n\n", (((struct dma_status *)buf)->length_transfer*0.954)/(((struct dma_status *)buf)->write_time.tv_usec + 1000000*((struct dma_status *)buf)->write_time.tv_sec ));
 			if(((struct dma_status *)buf)->pass_write) {
@@ -407,7 +408,6 @@ void grl_print_menu (char *buf) {
 				printf("Pass Write : Failed\n");
 			}
 		} else if(test_input == 2) {
-			printf("Access On Chip RAM	? %d\n\n", ((struct dma_status *)buf)->onchip);
 			printf("PCI x4 Read Time               : %ld s and %ld us\n", ((struct dma_status *)buf)->read_time.tv_sec, ((struct dma_status *)buf)->read_time.tv_usec);
 			printf("PCI x4 read Throughput         : %f GB/S\n", (((struct dma_status *)buf)->length_transfer*0.954)/(((struct dma_status *)buf)->read_time.tv_usec + 1000000*((struct dma_status *)buf)->read_time.tv_sec ));
 			printf("PCI x4 Write Time              : %ld s and %ld us\n", ((struct dma_status *)buf)->write_time.tv_sec, ((struct dma_status *)buf)->write_time.tv_usec);
