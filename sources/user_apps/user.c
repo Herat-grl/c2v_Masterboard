@@ -25,7 +25,7 @@
 
 #define BUFFER_LENGTH 40
 #define TIME_STAMP
-#define DEEP_DEBUG
+//#define DEEP_DEBUG
 
 #define DMA_PCIE_X8 1
 #define DMA_PCIE_X4 2
@@ -99,7 +99,7 @@ int check_dump()
 {
 	int i, flag = 1;
 
-	printf("status flag : %d\n", status_flag);
+//	printf("status flag : %d\n", status_flag);
 #ifdef DEEP_DEBUG
 	for(i=0; i<DATA_MAX_SIZE-1; i++) {
 		printf("(%#x %#x)\n", default_tx[i], default_rx[i+1]);
@@ -113,11 +113,11 @@ int check_dump()
 		}
 	}
 
-	if(status_flag) {
-		printf("Data does not matched!\n");
-	} else {
-		printf("Data match!!\n");
-	}
+	// if(status_flag) {
+	// 	printf("Data does not matched!\n");
+	// } else {
+	// 	printf("Data match!!\n");
+	// }
 
 	return status_flag;
 }
@@ -314,10 +314,9 @@ int SetInterfaceAttribs(int fd, int speed, int parity, int waitTime)
 
 #endif /*UART_LIB*/
 
-int data_check()
+void data_check()
 {
 	int i;
-printf("HERAT..............................\n");
 
 #ifdef DEEP_DEBUG
 	for(i = 0; i< DATA_MAX_SIZE; i++) {
@@ -328,15 +327,15 @@ printf("HERAT..............................\n");
 	for(i = 0; i< DATA_MAX_SIZE; i++) {
 		if(readBuff[i] != sendBuff[i]) {
 		//	printf("Sent and Recv Data both are not matched : %d!\n", i);
-		//	printf("(%#x %#x)\n", sendBuff[i], readBuff[i]);
+			printf("(%#x %#x)\n", sendBuff[i], readBuff[i]);
 			status_flag = 1;
 			break;
 		}
 	}
-	if(status_flag == 0)
-		printf("Sent And Recv Data Matched\n");
-	else
-		printf("Data does not match\n");
+	// if(status_flag == 0)
+	// 	printf("Sent And Recv Data Matched\n");
+	// else
+	// 	printf("Data does not match\n");
 
 }
 
@@ -386,13 +385,6 @@ void *sendThread(void *parameters)
 		usleep(500*1000);
 	}/*while*/
 
-// #ifdef TIME_STAMP
-// 	/* POSIX.1-2008 way */
-// 	if (clock_gettime(CLOCK_REALTIME,&start_uart_r))
-// 	{
-// 		printf("Failed to get Time!\n");
-// 	}
-// #endif
 	pthread_exit(0);
 }/*sendThread */
 
@@ -416,7 +408,7 @@ void *readThread(void *parameters)
     retStatus = pthread_cond_wait(&k_Intr_Cond, &k_Intr_lock);
   if(retStatus == 0)
   {
-	  #ifdef TIME_STAMP
+#ifdef TIME_STAMP
 	/* POSIX.1-2008 way */
 	if (clock_gettime(CLOCK_REALTIME,&start_uart_r))
 	{
@@ -427,11 +419,11 @@ void *readThread(void *parameters)
   {
 	  len = read(fd, &readBuff[recv_len], DATA_MAX_SIZE);
 	  recv_len += len;
-    printf("recv len : %d : l4n : %d\n", recv_len, len);
-    break;
+ //   printf("recv len : %d : l4n : %d\n", recv_len, len);
+ //   break;
   }while(recv_len < DATA_MAX_SIZE);
 
-  printf("Recv Len = %d \n", recv_len);
+//  printf("Recv Len = %d \n", recv_len);
 
   if(recv_len == DATA_MAX_SIZE)
   {
@@ -448,23 +440,6 @@ void *readThread(void *parameters)
 #endif
   }
 
-//   if (-1 == len)
-//   {
-//    switch(errno)
-//    {
-//     case EAGAIN:
-//     printf("__FUNCTION__ = %s, __LINE__ = %d\n", __FUNCTION__, __LINE__);
-//     usleep(5*1000);
-//     continue;
-//     break;
-
-//     default:
-//     printf("__FUNCTION__ = %s, __LINE__ = %d\n", __FUNCTION__, __LINE__);
-//      pthread_exit(0);
-//     break;
-//    }
-//   }
-
   if(0 == len)
   {
    printf("devic is lost!\n"); /*device maybe be unplugged*/
@@ -477,7 +452,7 @@ void *readThread(void *parameters)
 
  }/*while*/
 
-
+ pthread_mutex_unlock(&k_Intr_lock);
  pthread_exit(0);
 }/*readThread */
 
@@ -750,10 +725,10 @@ int test_dma_spi(char *buf) {
 	transfer(fd, default_tx, default_rx, sizeof(default_tx));
 
 	match = check_dump();
-	if(match) 
-		printf("data not Matched!\n");
-	else
-		printf("Data matched : %d\n", count);
+	// if(match) 
+	// 	printf("data not Matched!\n");
+	// else
+	// 	printf("Data matched\n");
 
 	menu_flag = 1;
 	close(fd);
