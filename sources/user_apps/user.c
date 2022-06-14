@@ -12,8 +12,13 @@
 #include <time.h>
 #include <errno.h>
 #include <pthread.h>
+#include <signal.h>
 
+#ifndef UART_LIB
+#include <termios.h>
+#else
 #include <asm/termios.h> /*termio.h for serial IO api*/
+#endif
 #include "i2c.h"
 
 
@@ -29,7 +34,7 @@
 #define DMA_I2C 5
 #define GPIO_PIN 6
 
-#define DATA_MAX_SIZE 512
+#define DATA_MAX_SIZE 200
 
 char sendBuff[DATA_MAX_SIZE];
 char readBuff[DATA_MAX_SIZE];
@@ -58,6 +63,10 @@ struct timespec start_uart_w, stop_uart_w, start_uart_r, stop_uart_r, start_spi,
 uint64_t elapsed = 0, start_time = 0, stop_time = 0, elapsed_rw = 0, elapsed_r = 0, elapsed_w = 0;
 int count;
 int status_flag = 0, inval_flag = 0;
+
+pthread_cond_t k_Intr_Cond = PTHREAD_COND_INITIALIZER;
+pthread_mutex_t k_Intr_lock = PTHREAD_MUTEX_INITIALIZER;
+struct timespec tms, start, stop;
 
 int kbhit(void)
 {
@@ -111,6 +120,27 @@ int check_dump()
 	}
 
 	return status_flag;
+}
+
+void signal_handler_IO (int status)
+{
+     printf("Sig Received \n");
+     pthread_cond_signal(&k_Intr_Cond);
+}
+
+int sig_init(int fd)
+{
+  struct sigaction saio;
+
+  saio.sa_handler = signal_handler_IO;
+  saio.sa_flags = 0;
+  saio.sa_restorer = NULL; 
+  sigaction(SIGIO,&saio,NULL);
+
+  fcntl(fd, F_SETFL, FNDELAY);
+  fcntl(fd, F_SETFL,  O_ASYNC );
+
+  return 0;
 }
 
 static void transfer(int fd, uint8_t const *tx, uint8_t const *rx, size_t len)
@@ -178,6 +208,66 @@ static void transfer(int fd, uint8_t const *tx, uint8_t const *rx, size_t len)
  * if waitTime  < 0, it is blockmode
  *  waitTime in unit of 100 millisec : 20 -> 2 seconds
  */
+#ifndef UART_LIB
+int SetInterfaceAttribs(int fd, int speed, int parity, int waitTime)
+{
+  int isBlockingMode;
+        struct termios tty, c_cc;
+
+        isBlockingMode = 0;
+        if(waitTime < 0 || waitTime > 255)
+   isBlockingMode = 1;
+
+        memset (&tty, 0, sizeof tty);
+        if (tcgetattr (fd, &tty) != 0) /* save current serial port settings */
+        {
+   printf("__LINE__ = %d, error %s\n", __LINE__, strerror(errno));
+            return -1;
+        }
+#if 0
+   	printf("******Get the termios config******\n");
+   	printf("inputmodes : tty.c_iflag = 0x%08x\n", tty.c_iflag);
+   	printf("outputmodes : tty.c_oflag = 0x%08x\n", tty.c_oflag);
+   	printf("controlmodes : tty.c_cflag = 0x%08x\n", tty.c_cflag);
+   	printf("localmodes : tty.c_lflag = 0x%08x\n", tty.c_lflag);
+   	printf("special characters : tty.c_cc = 0x%08x\n", tty.c_cc[NCCS]);
+	printf("##################################\n");
+#endif
+        cfsetospeed (&tty, speed);
+        cfsetispeed (&tty, speed);
+
+        tty.c_cflag = (tty.c_cflag & ~CSIZE) | CS8;     // 8-bit chars
+        // disable IGNBRK for mismatched speed tests; otherwise receive break
+        // as \000 chars
+        tty.c_iflag &= ~IGNBRK;         // disable break processing
+        tty.c_lflag = 0;                // no signaling chars, no echo,
+                                        // no canonical processing
+        tty.c_oflag = 0;                // no remapping, no delays
+        tty.c_cc[VMIN]  = (1 == isBlockingMode) ? 1 : 0;            // read doesn't block
+        tty.c_cc[VTIME] =  (1 == isBlockingMode)  ? 0 : waitTime;   // in unit of 100 milli-sec for set timeout value
+
+        tty.c_iflag &= ~(IXON | IXOFF | IXANY); // shut off xon/xoff ctrl
+
+        tty.c_cflag |= (CLOCAL | CREAD);// ignore modem controls,
+                                        // enable reading
+        tty.c_cflag &= ~(PARENB | PARODD);      // shut off parity
+        tty.c_cflag |= parity;
+        tty.c_cflag &= ~CSTOPB;
+        tty.c_cflag &= ~CRTSCTS;
+
+	tty.c_iflag = 0x00;
+	//tty.c_cflag = 0x00001cb0;
+
+        if (tcsetattr (fd, TCSANOW, &tty) != 0)
+        {
+                printf("__LINE__ = %d, error %s\n", __LINE__, strerror(errno));
+                return -1;
+        }
+        return 0;
+}/*SetInterfaceAttribs*/
+
+#else
+
 int SetInterfaceAttribs(int fd, int speed, int parity, int waitTime)
 {
 	int isBlockingMode;
@@ -222,9 +312,12 @@ int SetInterfaceAttribs(int fd, int speed, int parity, int waitTime)
 	return 0;
 }/*SetInterfaceAttribs*/
 
+#endif /*UART_LIB*/
+
 int data_check()
 {
 	int i;
+printf("HERAT..............................\n");
 
 #ifdef DEEP_DEBUG
 	for(i = 0; i< DATA_MAX_SIZE; i++) {
@@ -240,8 +333,10 @@ int data_check()
 			break;
 		}
 	}
-//	if(status_flag == 0)
-//		printf("Sent And Recv Data Matched\n");
+	if(status_flag == 0)
+		printf("Sent And Recv Data Matched\n");
+	else
+		printf("Data does not match\n");
 
 }
 
@@ -291,74 +386,99 @@ void *sendThread(void *parameters)
 		usleep(500*1000);
 	}/*while*/
 
-#ifdef TIME_STAMP
+// #ifdef TIME_STAMP
+// 	/* POSIX.1-2008 way */
+// 	if (clock_gettime(CLOCK_REALTIME,&start_uart_r))
+// 	{
+// 		printf("Failed to get Time!\n");
+// 	}
+// #endif
+	pthread_exit(0);
+}/*sendThread */
+
+void *readThread(void *parameters)
+{
+// char readBuff[DATA_MAX_SIZE];
+
+ int fd, retStatus;
+ ssize_t recv_len = 0;
+
+ fd = *((int*)parameters);
+
+ ssize_t len = 0;
+
+ memset(&readBuff[0], 0, DATA_MAX_SIZE);
+
+ while(1)
+ {
+    pthread_mutex_lock(&k_Intr_lock);
+
+    retStatus = pthread_cond_wait(&k_Intr_Cond, &k_Intr_lock);
+  if(retStatus == 0)
+  {
+	  #ifdef TIME_STAMP
 	/* POSIX.1-2008 way */
 	if (clock_gettime(CLOCK_REALTIME,&start_uart_r))
 	{
 		printf("Failed to get Time!\n");
 	}
 #endif
-	pthread_exit(0);
-}/*sendThread */
+  do
+  {
+	  len = read(fd, &readBuff[recv_len], DATA_MAX_SIZE);
+	  recv_len += len;
+    printf("recv len : %d : l4n : %d\n", recv_len, len);
+    break;
+  }while(recv_len < DATA_MAX_SIZE);
 
-void *readThread(void *parameters)
-{
-	int fd;
-	ssize_t recv_len = 0;
-	fd = *((int*)parameters);
-	ssize_t len;
-	int i;
+  printf("Recv Len = %d \n", recv_len);
 
-	while(1)
-	{
-		do
-		{
-			len = read(fd, &readBuff[recv_len], DATA_MAX_SIZE);
-			recv_len += len;
-		}while(recv_len < DATA_MAX_SIZE);
-
-		if(recv_len == DATA_MAX_SIZE)
-		{
+  if(recv_len == DATA_MAX_SIZE)
+  {
 #ifdef TIME_STAMP
-			/* POSIX.1-2008 way */
-			if (clock_gettime(CLOCK_REALTIME,&stop_uart_r))
-			{
-				printf("Failed to get Time!\n");
-			}
-			/* seconds, multiplied with 1 million */
-			break;
-#endif
-		}
-
-		if (-1 == len)
-		{
-			switch(errno)
-			{
-				case EAGAIN:
-					printf("__FUNCTION__ = %s, __LINE__ = %d\n", __FUNCTION__, __LINE__);
-					usleep(5*1000);
-					continue;
-					break;
-
-				default:
-					printf("__FUNCTION__ = %s, __LINE__ = %d\n", __FUNCTION__, __LINE__);
-					pthread_exit(0);
-					break;
-			}
-		}
-
-		if(len == 0)
-		{
-			printf("devic is lost!\n"); /*device maybe be unplugged*/
-			exit(0);
-		}/*if*/
-		if(recv_len == DATA_MAX_SIZE)
-			break;
-	}/*while*/
+ /* POSIX.1-2008 way */
+    if (clock_gettime(CLOCK_REALTIME, &stop_uart_r))
+    {
+    	printf("Failed to get Time!\n");
+    }
 
 	data_check();
 
-	pthread_exit(0);
+    break;
+#endif
+  }
+
+//   if (-1 == len)
+//   {
+//    switch(errno)
+//    {
+//     case EAGAIN:
+//     printf("__FUNCTION__ = %s, __LINE__ = %d\n", __FUNCTION__, __LINE__);
+//     usleep(5*1000);
+//     continue;
+//     break;
+
+//     default:
+//     printf("__FUNCTION__ = %s, __LINE__ = %d\n", __FUNCTION__, __LINE__);
+//      pthread_exit(0);
+//     break;
+//    }
+//   }
+
+  if(0 == len)
+  {
+   printf("devic is lost!\n"); /*device maybe be unplugged*/
+   exit(0);
+  }/*if*/
+
+  printf("\n");
+  break;
+ }
+
+ }/*while*/
+
+
+ pthread_exit(0);
 }/*readThread */
 
 void red () {
@@ -532,7 +652,7 @@ int test_dma_pcie_x4(char *buf) {
 }
 
 int test_dma_uart(char *buf) {
-	int fd;
+	int fd, stat;
 
 	menu_flag = 1;
 
@@ -543,7 +663,12 @@ int test_dma_uart(char *buf) {
 		exit(-1);
 	}/*if */
 
-	SetInterfaceAttribs(fd, uart_speed, 0, 20); /* set speed to 57600 bps, 8n1 (no parity), timeout 2 secs*/
+	stat = sig_init(fd);
+#ifndef UART_LIB
+	SetInterfaceAttribs(fd, B4000000, 0, 20);
+#else
+	SetInterfaceAttribs(fd, 4000000, 0, 20); /* set speed to 57600 bps, 8n1 (no parity), timeout 2 secs*/
+#endif
 
 #if 0			/*temprary fix for UART 1st boot not work */
 	close(fd);
@@ -747,8 +872,8 @@ int test_dma_periferal(char *buf) {
 			test_dma_pcie_x4(buf);
 			break;
 		case DMA_UART:
-			printf("please enter speed for test UART : ");
-			scanf("%d", & uart_speed);
+			// printf("please enter speed for test UART : ");
+			// scanf("%d", & uart_speed);
 			test_dma_uart(buf);
 			break;
 		case DMA_SPI:
